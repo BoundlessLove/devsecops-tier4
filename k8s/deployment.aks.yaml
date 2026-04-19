@@ -1,0 +1,22 @@
+# k8s/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aks-demo-deployment
+  labels:
+    app: aks-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aks-demo
+  template:
+    metadata:
+      labels:
+        app: aks-demo
+    spec:
+      containers:
+        - name: aks-demo
+          image: ${AZURE_CONTAINER_REGISTRY}.azurecr.io/aks-demo:${IMAGE_TAG}
+          ports:
+            - containerPort: 8080
