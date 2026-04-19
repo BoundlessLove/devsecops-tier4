@@ -12,9 +12,9 @@ jobs:
       contents: read
 
     env:
-      ACR_NAME: ${{ secrets.ACR_NAME }}
-      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-      AKS_NAME: ${{ secrets.AZURE_AKS_NAME }}
+      ACR_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      AKS_NAME: ${{ secrets.CLUSTER_NAME }}
       IMAGE_NAME: aks-demo
       IMAGE_TAG: latest
 
