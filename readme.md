@@ -40,12 +40,17 @@ c. Verify deployment and launch
 
 i. kubectl get pods
 
-ii. kubectl get svc aks-demo-service. You should see service type of load balancer.
+ii. kubectl get svc aks-demo-service. You should see service type of load balancer. It is a traefik load balancer. You can see it via:
 
-iii. kubectl port-forward svc/aks-demo-service 8080:8080
+- kubectl get pods -n kube-system | findstr traefik
 
 iv. [Navigate to] http://localhost:8080.
 
 
+
 ## Version 0.2
 19 April 2026 19:37 - Pre-req is creating an Azure Container Registry (ACR) and an Azure Kubernetes Cluster (containing the ACR). First attempt at CICD AKS. 
+
+
+## Version 0.3
+24 April 2026 16:36 - Kubernetes working locally with k3d's Traefik load balancer. Steps to setup have been documented in Readme.md file under heading 'local dev'.  
