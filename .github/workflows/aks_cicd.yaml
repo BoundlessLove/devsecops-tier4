@@ -74,8 +74,8 @@ jobs:
     - name: Get AKS Credentials
       run: |
         az aks get-credentials \
-        --resource-group <RG> \
-        --name <AKS_NAME> \
+        --resource-group $RESOURCE_GROUP \
+        --name $AKS_NAME \
         --overwrite-existing \
         --api-version 2024-11-01
 
