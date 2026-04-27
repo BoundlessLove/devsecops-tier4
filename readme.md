@@ -155,9 +155,11 @@ vii) IMAGE_NAME
 viii) IMAGE_TAG
 
 
- b. Adding github workflow aks_cicd.yaml, nativising it by adding trigger point as commit to Main branch.
+ b. Adding github workflow aks_cicd.yaml from devsecops-tier3 dev branch, nativising it by adding trigger point as commit to Main branch.
  
- c. Creating a federated-credentail for the pipeline
+ c. Creating a federated-credential for the pipeline
+ 
+ ```
 
 PS /home/jay> az ad app federated-credential create --id <App registeration Client ID>   --parameters '{
     "name": "github-devsecops-tier4-aks",
@@ -166,7 +168,187 @@ PS /home/jay> az ad app federated-credential create --id <App registeration Clie
     "audiences": ["api://AzureADTokenExchange"]
   }'
 
+```
 
+d. Adding a Nginx controller creation file - ingress-nginx.aks.yaml
+
+```
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingress-nginx
+    spec:
+      containers:
+      - name: controller
+        image: registry.k8s.io/ingress-nginx/controller:v1.11.1
+        args:
+          - /nginx-ingress-controller
+        ports:
+        - name: http
+          containerPort: 80
+        - name: https
+          containerPort: 443
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  - name: https
+    port: 443
+    targetPort: 443
+
+```
+
+e. Adding BICEP files to create the infrastructure from devsecops-tier3 dev branch
+
+f. Updating aks_cicd.yaml to remove helm deployment steps and replace them with docker deployment
+
+```
+name: Build and Deploy to AKS
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      ACR_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      AKS_NAME: ${{ secrets.CLUSTER_NAME }}
+      LOCATION: ${{ secrets.AZURE_LOCATION }}
+      IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
+      IMAGE_TAG: ${{ secrets.IMAGE_TAG }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    # 0. Ensure Resource Group
+    - name: Ensure Resource Group exists
+      run: |
+        az group create \
+          --name "$RESOURCE_GROUP" \
+          --location "$LOCATION"
+
+    # 1. Deploy Infra via Bicep
+    - name: Deploy ACR + AKS via Bicep
+      run: |
+        az deployment group create \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "aks-infra-deploy" \
+          --template-file infra/main.bicep \
+          --parameters acrName="$ACR_NAME" aksName="$AKS_NAME"
+
+    - name: Attach ACR to AKS
+      run: |
+        az aks update \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "$AKS_NAME" \
+          --attach-acr "$ACR_NAME"
+
+    # 2. Build & Push Image
+    - name: Build and Push Image to ACR
+      run: |
+        az acr login --name "$ACR_NAME"
+        IMAGE="$ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG"
+        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+        docker build -t "$IMAGE" .
+        docker push "$IMAGE"
+
+    # 3. Connect to AKS
+    - name: Get AKS Credentials
+      run: |
+        az aks get-credentials \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "$AKS_NAME" \
+          --overwrite-existing
+
+    # 4. Install NGINX Ingress Controller ( ingress-nginx.aks.yaml)
+    - name: Apply Ingress Controller
+      run: |
+        kubectl apply -f k8s/ingress/ingress-nginx.aks.yaml
+
+    # 5. Deploy Application + Ingress + Cloudflared
+    - name: Apply Kubernetes Manifests
+      run: |
+        kubectl apply -f k8s/app/deployment.aks.yaml
+        kubectl apply -f k8s/app/service.aks.yaml
+        kubectl apply -f k8s/ingress/staging-ingress-nginx.aks.yaml
+        kubectl apply -f k8s/cloudflared/cloudflared-deployment.aks.yaml
+
+```
+
+g. Final currently usable structure of repository
+
+```
+infra/
+  main.bicep
+
+k8s/
+  app/
+    deployment.aks.yaml
+    service.aks.yaml
+
+  ingress/
+    staging-ingress-nginx.aks.yaml
+    ingress-nginx.aks.yaml   # corrected AKS version
+
+  cloudflared/
+    cloudflared-deployment.aks.yaml
+    config.yml
+    credentials/
+      credentials.json
+
+.github/
+  workflows/
+    aks-cicd.yml
+
+Dockerfile
+server.js
+
+```
+ 
 
 ## Annex A - How to create a connection to Cloudflare
 
