@@ -81,6 +81,8 @@ jobs:
     # 4. Install NGINX Ingress Controller ( ingress-nginx.aks.yaml)
     - name: Apply Ingress Controller
       run: |
+        kubectl delete namespace ingress-nginx --ignore-not-found=true
+
         helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
         helm repo update
 
