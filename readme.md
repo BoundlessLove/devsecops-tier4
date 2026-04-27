@@ -265,6 +265,10 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Force Azure CLI to use stable AKS API version
+      run: |
+        az config set defaults.aks.api-version=2024-11-01
+
     # 0. Ensure Resource Group exists (via Bicep)
     - name: Ensure Resource Group exists
       run: |
@@ -331,9 +335,6 @@ jobs:
           exit 1
         fi
         echo "✅ Response matched expected output"
-
-
-
 
 ```
 
