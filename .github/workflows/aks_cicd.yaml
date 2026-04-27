@@ -15,7 +15,7 @@ jobs:
 
     env:
       ACR_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
-      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
       AKS_NAME: ${{ secrets.CLUSTER_NAME }}
       LOCATION: ${{ secrets.AZURE_LOCATION }}
       IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
