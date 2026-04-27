@@ -248,7 +248,7 @@ jobs:
 
     env:
       ACR_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
-      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
       AKS_NAME: ${{ secrets.CLUSTER_NAME }}
       LOCATION: ${{ secrets.AZURE_LOCATION }}
       IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
@@ -265,13 +265,14 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    # 0. Ensure Resource Group exists (via Bicep)
     - name: Ensure Resource Group exists
       run: |
-        if ! az group exists --name "$RESOURCE_GROUP"; then
-          az group create \
-            --name "$RESOURCE_GROUP" \
-            --location "$LOCATION"
-        fi
+        az deployment sub create \
+          --location "$LOCATION" \
+          --template-file infra/create-rg.bicep \
+          --parameters rgName="$RESOURCE_GROUP" rgLocation="$LOCATION"
+
 
     # 1. Deploy Infra via Bicep
     - name: Deploy ACR + AKS via Bicep
@@ -318,6 +319,21 @@ jobs:
         kubectl apply -f k8s/app/service.aks.yaml
         kubectl apply -f k8s/ingress/staging-ingress-nginx.aks.yaml
         kubectl apply -f k8s/cloudflared/cloudflared-deployment.aks.yaml
+
+    # 6. Verify successful deployment
+    - name: Smoke test HTTP endpoint
+      run: |
+        echo "Testing https://staging.systematicdefence.tech"
+        RESPONSE=$(curl -fsSL https://staging.systematicdefence.tech)
+        echo "Response: $RESPONSE"
+        if [ "$RESPONSE" != "Hello from aks-demo running on k3d!" ]; then
+          echo "❌ Unexpected response"
+          exit 1
+        fi
+        echo "✅ Response matched expected output"
+
+
+
 
 ```
 
@@ -550,8 +566,9 @@ ingress:
   - hostname: staging.systematicdefence.tech
     service: http://aks-demo-service.default.svc.cluster.local:80
   - service: http_status:404
-```
 
+```
+---
 ##### docker-compose.yml
 
 ``` yaml
@@ -569,7 +586,7 @@ services:
     network_mode: bridge
 
 ```
-
+---
 ##### ingress/staging-ingress-via-service.local.yaml
 
 ```yaml
@@ -591,7 +608,7 @@ spec:
               number: 8080
 
 ```
-
+---
 #### b) Tunnel uses Ingress
 
 ##### The plan is:
@@ -646,8 +663,9 @@ spec:
     controller:
       service:
         type: ClusterIP
+
 ```
-        
+---        
 ##### ingress/staging-ingress-nginx.local.yaml
 
 ```yaml
@@ -671,7 +689,7 @@ spec:
             port:
               number: 80
 ```
-
+---
 ##### config.yml
 
 ```yaml
@@ -683,10 +701,11 @@ ingress:
     service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
   - service: http_status:404
 ```
-
+---
 ##### docker-compose.yml
 
 ```yaml
+
 version: "3.8"
 
 services:
@@ -699,8 +718,8 @@ services:
       - ./config.yml:/etc/cloudflared/config.yml
       - ./<tunnel-id>.json:/etc/cloudflared/<tunnel-id>.json
     network_mode: bridge
-```    
-    
+```
+---
 #### c) Common file for Tunnel
 
 The Deployment that:
@@ -730,6 +749,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cloudflared
+  namespace: default
   labels:
     app: cloudflared
 spec:
@@ -764,6 +784,7 @@ spec:
       - name: creds
         secret:
           secretName: cloudflared-credentials
+
 ```
 
 ### STEP 8 - Deploy cloudflared inside Kubernetes

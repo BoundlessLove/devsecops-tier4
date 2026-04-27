@@ -86,3 +86,17 @@ jobs:
         kubectl apply -f k8s/app/service.aks.yaml
         kubectl apply -f k8s/ingress/staging-ingress-nginx.aks.yaml
         kubectl apply -f k8s/cloudflared/cloudflared-deployment.aks.yaml
+
+    # 6. Verify successful deployment
+    - name: Smoke test HTTP endpoint
+      run: |
+        echo "Testing https://staging.systematicdefence.tech"
+        RESPONSE=$(curl -fsSL https://staging.systematicdefence.tech)
+        echo "Response: $RESPONSE"
+        if [ "$RESPONSE" != "Hello from aks-demo running on k3d!" ]; then
+          echo "❌ Unexpected response"
+          exit 1
+        fi
+        echo "✅ Response matched expected output"
+
+
