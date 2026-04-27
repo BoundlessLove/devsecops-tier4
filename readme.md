@@ -337,9 +337,56 @@ jobs:
         echo "✅ Response matched expected output"
 
 ```
+g. Creating aks manifests
+
+i) k8s/ingress/staging-ingress-nginx.aks.yaml 
+
+```
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: staging-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+  - host: staging.systematicdefence.tech
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: aks-demo-service
+            port:
+              number: 80
+
+```
 
 
-g. Final currently usable structure of repository
+ii) k8s/app/service.aks.yaml 
+As my ingress above routes to port 80, so service should also expose port 80. Further I move it to cluster IP from Load Balancer type, as is required by nginx:
+
+
+```
+apiVersion: v1
+kind: Service
+metadata:
+  name: aks-demo-service
+spec:
+  type: ClusterIP
+  selector:
+    app: aks-demo
+  ports:
+    - port: 80
+      targetPort: 8080
+
+```
+
+
+
+h. Final currently usable structure of repository
 
 ```
 infra/
