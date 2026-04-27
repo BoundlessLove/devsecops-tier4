@@ -35,10 +35,11 @@ jobs:
     # 0. Ensure Resource Group
     - name: Ensure Resource Group exists
       run: |
-        az group create \
-        --name "$RESOURCE_GROUP" \
+        az deployment sub create \
         --location "$LOCATION" \
-        --api-version 2021-04-01
+        --template-file infra/create-rg.bicep \
+        --parameters rgName="$RESOURCE_GROUP" rgLocation="$LOCATION"
+
 
 
     # 1. Deploy Infra via Bicep
