@@ -10,8 +10,16 @@ permissions:
   contents: read
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+
+    env:
+      ACR_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      RESOURCE_GROUP: ${{ secrets.RESOURCE_GROUP }}
+      AKS_NAME: ${{ secrets.CLUSTER_NAME }}
+      LOCATION: ${{ secrets.AZURE_LOCATION }}
+      IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
+      IMAGE_TAG: ${{ secrets.IMAGE_TAG }}
 
     steps:
     - name: Checkout
@@ -24,34 +32,55 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Azure CLI - Get ACR login server
-      id: acr
+    # 0. Ensure Resource Group
+    - name: Ensure Resource Group exists
       run: |
-        ACR_NAME=${{ secrets.AZURE_CONTAINER_REGISTRY }}
-        echo "login_server=$(az acr show --name $ACR_NAME --query loginServer -o tsv)" >> $GITHUB_OUTPUT
+        az group create \
+          --name "$RESOURCE_GROUP" \
+          --location "$LOCATION"
 
-    - name: Build and Push Docker Image
+    # 1. Deploy Infra via Bicep
+    - name: Deploy ACR + AKS via Bicep
       run: |
-        IMAGE="${{ steps.acr.outputs.login_server }}/aks-demo:${{ github.sha }}"
+        az deployment group create \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "aks-infra-deploy" \
+          --template-file infra/main.bicep \
+          --parameters acrName="$ACR_NAME" aksName="$AKS_NAME"
+
+    - name: Attach ACR to AKS
+      run: |
+        az aks update \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "$AKS_NAME" \
+          --attach-acr "$ACR_NAME"
+
+    # 2. Build & Push Image
+    - name: Build and Push Image to ACR
+      run: |
+        az acr login --name "$ACR_NAME"
+        IMAGE="$ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG"
         echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-        az acr build --registry ${{ secrets.AZURE_CONTAINER_REGISTRY }} --image aks-demo:${{ github.sha }} .
+        docker build -t "$IMAGE" .
+        docker push "$IMAGE"
 
+    # 3. Connect to AKS
     - name: Get AKS Credentials
       run: |
         az aks get-credentials \
-          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-          --name ${{ secrets.CLUSTER_NAME }} \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "$AKS_NAME" \
           --overwrite-existing
 
-    - name: Update image in deployment
+    # 4. Install NGINX Ingress Controller ( ingress-nginx.aks.yaml)
+    - name: Apply Ingress Controller
       run: |
-        kubectl set image deployment/aks-demo-deployment \
-          aks-demo=$IMAGE
+        kubectl apply -f k8s/ingress/ingress-nginx.aks.yaml
 
+    # 5. Deploy Application + Ingress + Cloudflared
     - name: Apply Kubernetes Manifests
       run: |
-        kubectl apply -f k8s/ingress/ingress-nginx.yaml
-        kubectl apply -f k8s/ingress/staging-ingress.yaml
-        kubectl apply -f k8s/app/deployment.yaml
-        kubectl apply -f k8s/app/service.yaml
-        kubectl apply -f k8s/cloudflared/cloudflared-deployment.yaml
+        kubectl apply -f k8s/app/deployment.aks.yaml
+        kubectl apply -f k8s/app/service.aks.yaml
+        kubectl apply -f k8s/ingress/staging-ingress-nginx.aks.yaml
+        kubectl apply -f k8s/cloudflared/cloudflared-deployment.aks.yaml
