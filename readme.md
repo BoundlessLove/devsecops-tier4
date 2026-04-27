@@ -629,11 +629,6 @@ image: "devsecopstier2acr.azurecr.io/aks-demo:latest"
 ```
 
 
-
-
-
-
-
 ##### SOLUTION IS HELM IMPLEMENTATION
 
 ###### 1. Structure and Components
@@ -755,7 +750,232 @@ Note: Even ACR name can be overridden:
 --set acrName=${ACR_NAME}
 ```
 
+## Version 2.0
 
+To resolve Version 1.2 Issue 2, it was decided to move to Helm to deploy the applcation as there are roll back options and more importantly the values like 'Image Name' can be picked up during the flow of the yaml.
+
+Following files added:
+
+### a) aks_cicd.yaml
+
+```yaml
+name: Build and Deploy to AKS
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      ACR_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      AKS_NAME: ${{ secrets.CLUSTER_NAME }}
+      LOCATION: ${{ secrets.AZURE_LOCATION }}
+      IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
+      IMAGE_TAG: ${{ secrets.IMAGE_TAG }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Force Azure CLI to use stable AKS API version
+      run: |
+        az config set defaults.aks.api-version=2024-11-01
+
+    # 0. Ensure Resource Group exists (via Bicep)
+    - name: Ensure Resource Group exists
+      run: |
+        az deployment sub create \
+          --location "$LOCATION" \
+          --template-file infra/create-rg.bicep \
+          --parameters rgName="$RESOURCE_GROUP" rgLocation="$LOCATION"
+
+    # 1. Deploy Infra via Bicep
+    - name: Deploy ACR + AKS via Bicep
+      run: |
+        az deployment group create \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "aks-infra-deploy" \
+          --template-file infra/main.bicep \
+          --parameters acrName="$ACR_NAME" aksName="$AKS_NAME"
+
+    - name: Attach ACR to AKS
+      run: |
+        az aks update \
+          --resource-group "$RESOURCE_GROUP" \
+          --name "$AKS_NAME" \
+          --attach-acr "$ACR_NAME"
+
+    # 2. Build & Push Image
+    - name: Build and Push Image to ACR
+      run: |
+        az acr login --name "$ACR_NAME"
+        IMAGE="$ACR_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG"
+        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+        docker build -t "$IMAGE" .
+        docker push "$IMAGE"
+
+    # 3. Connect to AKS
+    - name: Get AKS Credentials
+      run: |
+        az aks get-credentials \
+        --resource-group $RESOURCE_GROUP \
+        --name $AKS_NAME \
+        --overwrite-existing
+
+    # 4. Install NGINX Ingress Controller
+    - name: Install Ingress Controller
+      run: |
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+          --namespace ingress-nginx \
+          --create-namespace \
+          --set controller.service.type=LoadBalancer \
+          --set controller.ingressClassResource.name=nginx \
+          --set controller.ingressClassResource.controllerValue="k8s.io/ingress-nginx"
+
+    # 5. Deploy Application via Helm
+    - name: Deploy aks-demo via Helm
+      run: |
+        if [[ "${GITHUB_REF##*/}" == "staging" ]]; then
+          VALUES_FILE="./helm/aks-demo/values-staging.yaml"
+          RELEASE="aks-demo-staging"
+          NAMESPACE="staging"
+        else
+          VALUES_FILE="./helm/aks-demo/values-prod.yaml"
+          RELEASE="aks-demo"
+          NAMESPACE="prod"
+        fi
+
+        helm upgrade --install "$RELEASE" ./helm/aks-demo \
+          --namespace "$NAMESPACE" \
+          --create-namespace \
+          -f "$VALUES_FILE" \
+          --set imageTag="$IMAGE_TAG"
+
+    # 6. Deploy Cloudflare Tunnel via Helm
+    - name: Deploy Cloudflare Tunnel
+      run: |
+        helm upgrade --install cloudflared ./helm/aks-demo \
+          --namespace cloudflare \
+          --create-namespace \
+          -f ./helm/aks-demo/cloudflared-values.yaml
+
+    # 7. Smoke test
+    - name: Smoke test HTTP endpoint
+      run: |
+        if [[ "${GITHUB_REF##*/}" == "staging" ]]; then
+          URL="https://staging.systematicdefence.tech"
+        else
+          URL="https://systematicdefence.tech"
+        fi
+
+        echo "Testing $URL"
+        RESPONSE=$(curl -fsSL "$URL")
+        echo "Response: $RESPONSE"
+
+        if [[ "$RESPONSE" != "Hello from aks-demo running on AKS!" ]]; then
+          echo "❌ Unexpected response"
+          exit 1
+        fi
+
+        echo "✅ Response matched expected output"
+```
+
+### b)  Helm files to manage deploying to multiple environments
+
+#### i. values-prod.yaml
+
+```
+
+
+```
+
+#### ii. values-staging.yaml
+
+```
+
+
+```
+
+#### iii. Cloudflared-values-prod.yaml
+
+```
+
+
+```
+
+#### iii. Cloudflared-values-staging.yaml
+
+```
+
+
+```
+
+### c) ingress.yaml
+
+Note: This initially fails yaml lint check as it has HELM syntax. Ignore it.
+
+```
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aks-demo-ingress
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.className | quote }}
+spec:
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: aks-demo-service
+                port:
+                  number: {{ .Values.service.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName | quote }}
+  {{- end }}
+{{- end }}
+```
+
+### c) helm/aks-demo/templates/ingress.yaml
+
+````
+
+````
+
+### d) helm/aks-demo/templates/cloudflared-deployment.yaml
+
+```
+
+```
+
+Please refere to Readme2.md in this repo for the concepts needed to run this pipeline. Firstly, ensure you have created a staging branch.
 
 
 ## Annex A - How to create a connection to Cloudflare

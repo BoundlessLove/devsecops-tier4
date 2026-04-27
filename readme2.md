@@ -51,12 +51,18 @@ Branches:
 
 ## Rollback
 
-To rollback a bad release:
+To rollback a bad release in:
+
+a. Production
 
 ```bash
 helm history aks-demo -n prod
 helm rollback aks-demo <REVISION> -n prod
-For staging:
+```
+
+b. Staging:
+
+```bash
 helm history aks-demo-staging -n staging
 helm rollback aks-demo-staging <REVISION> -n staging
 ```

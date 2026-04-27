@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - staging
 
 permissions:
   id-token: write
@@ -45,6 +44,7 @@ jobs:
           --template-file infra/create-rg.bicep \
           --parameters rgName="$RESOURCE_GROUP" rgLocation="$LOCATION"
 
+
     # 1. Deploy Infra via Bicep
     - name: Deploy ACR + AKS via Bicep
       run: |
@@ -78,62 +78,38 @@ jobs:
         --name $AKS_NAME \
         --overwrite-existing
 
-    # 4. Install NGINX Ingress Controller
-    - name: Install Ingress Controller
+    # 4. Install NGINX Ingress Controller ( ingress-nginx.aks.yaml)
+    - name: Apply Ingress Controller
       run: |
         helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
         helm repo update
 
         helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-          --namespace ingress-nginx \
-          --create-namespace \
-          --set controller.service.type=LoadBalancer \
-          --set controller.ingressClassResource.name=nginx \
-          --set controller.ingressClassResource.controllerValue="k8s.io/ingress-nginx"
+        --namespace ingress-nginx \
+        --create-namespace \
+        --set controller.service.type=ClusterIP \
+        --set controller.ingressClassResource.name=nginx \
+        --set controller.ingressClassResource.controllerValue="k8s.io/ingress-nginx"
 
-    # 5. Deploy Application via Helm
-    - name: Deploy aks-demo via Helm
+
+    # 5. Deploy Application + Ingress + Cloudflared
+    - name: Apply Kubernetes Manifests
       run: |
-        if [[ "${GITHUB_REF##*/}" == "staging" ]]; then
-          VALUES_FILE="./helm/aks-demo/values-staging.yaml"
-          RELEASE="aks-demo-staging"
-          NAMESPACE="staging"
-        else
-          VALUES_FILE="./helm/aks-demo/values-prod.yaml"
-          RELEASE="aks-demo"
-          NAMESPACE="prod"
-        fi
+        kubectl apply -f k8s/app/deployment.aks.yaml
+        kubectl apply -f k8s/app/service.aks.yaml
+        kubectl apply -f k8s/ingress/staging-ingress-nginx.aks.yaml
+        kubectl apply -f k8s/cloudflared/cloudflared-deployment.aks.yaml
 
-        helm upgrade --install "$RELEASE" ./helm/aks-demo \
-          --namespace "$NAMESPACE" \
-          --create-namespace \
-          -f "$VALUES_FILE" \
-          --set imageTag="$IMAGE_TAG"
-
-    # 6. Deploy Cloudflare Tunnel via Helm
-    - name: Deploy Cloudflare Tunnel
-      run: |
-        helm upgrade --install cloudflared ./helm/aks-demo \
-          --namespace cloudflare \
-          --create-namespace \
-          -f ./helm/aks-demo/cloudflared-values.yaml
-
-    # 7. Smoke test
+    # 6. Verify successful deployment
     - name: Smoke test HTTP endpoint
       run: |
-        if [[ "${GITHUB_REF##*/}" == "staging" ]]; then
-          URL="https://staging.systematicdefence.tech"
-        else
-          URL="https://systematicdefence.tech"
-        fi
-
-        echo "Testing $URL"
-        RESPONSE=$(curl -fsSL "$URL")
+        echo "Testing https://staging.systematicdefence.tech"
+        RESPONSE=$(curl -fsSL https://staging.systematicdefence.tech)
         echo "Response: $RESPONSE"
-
-        if [[ "$RESPONSE" != "Hello from aks-demo running on AKS!" ]]; then
+        if [ "$RESPONSE" != "Hello from aks-demo running on k3d!" ]; then
           echo "❌ Unexpected response"
           exit 1
         fi
-
         echo "✅ Response matched expected output"
+
+
