@@ -171,66 +171,31 @@ PS /home/jay> az ad app federated-credential create --id <App registeration Clie
 
 ```
 
-d. Adding a Nginx controller creation file - ingress-nginx.aks.yaml
+d. Adding a Nginx controller 
 
-```
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ingress-nginx
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ingress-nginx-controller
-  namespace: ingress-nginx
-  labels:
-    app.kubernetes.io/name: ingress-nginx
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: ingress-nginx
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: ingress-nginx
-    spec:
-      containers:
-      - name: controller
-        image: registry.k8s.io/ingress-nginx/controller:v1.11.1
-        args:
-          - /nginx-ingress-controller
-        ports:
-        - name: http
-          containerPort: 80
-        - name: https
-          containerPort: 443
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ingress-nginx-controller
-  namespace: ingress-nginx
-spec:
-  type: ClusterIP
-  selector:
-    app.kubernetes.io/name: ingress-nginx
-  ports:
-  - name: http
-    port: 80
-    targetPort: 80
-  - name: https
-    port: 443
-    targetPort: 443
+In a local cluster, it was see in dev branch of DevSecOps-Tier2 how this controller was created for the k3s cluster. However, in aks this is far more complicated as the Nginx controller must also implement:
 
-```
+- RBAC  
+- ServiceAccount  
+- ClusterRole  
+- ClusterRoleBinding  
+- Correct controller args  
+- Correct labels  
+- Readiness/liveness probes  
+
+Otherwise, NGINX never bound to port 80 meaning cloudflared would forward traffic to a dead endpoint, returning something like a  **530 Origin Unreachable**. Hence, Helm step instead is added to setup the controller in the aks_cicd.yaml file in STEP G.i).
+
+
 
 e. Adding BICEP files to create the infrastructure from devsecops-tier3 dev branch
 
 f. Updating aks_cicd.yaml to remove helm deployment steps and replace them with docker deployment
 
-```
+g. Creating aks manifests
+
+i) .github/workflows/aks_cicd.yaml
+
+```yaml
 name: Build and Deploy to AKS
 
 on:
@@ -314,7 +279,16 @@ jobs:
     # 4. Install NGINX Ingress Controller ( ingress-nginx.aks.yaml)
     - name: Apply Ingress Controller
       run: |
-        kubectl apply -f k8s/ingress/ingress-nginx.aks.yaml
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+        --namespace ingress-nginx \
+        --create-namespace \
+        --set controller.service.type=ClusterIP \
+        --set controller.ingressClassResource.name=nginx \
+        --set controller.ingressClassResource.controllerValue="k8s.io/ingress-nginx"
+
 
     # 5. Deploy Application + Ingress + Cloudflared
     - name: Apply Kubernetes Manifests
@@ -337,9 +311,9 @@ jobs:
         echo "✅ Response matched expected output"
 
 ```
-g. Creating aks manifests
 
-i) k8s/ingress/staging-ingress-nginx.aks.yaml 
+
+ii) k8s/ingress/staging-ingress-nginx.aks.yaml 
 
 ```
 apiVersion: networking.k8s.io/v1
@@ -365,7 +339,7 @@ spec:
 ```
 
 
-ii) k8s/app/service.aks.yaml 
+iii) k8s/app/service.aks.yaml 
 
 As my ingress above routes to port 80, so service should also expose port 80. Further I move it to cluster IP from Load Balancer type, as is required by nginx:
 
