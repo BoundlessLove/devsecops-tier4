@@ -81,7 +81,16 @@ jobs:
     # 4. Install NGINX Ingress Controller ( ingress-nginx.aks.yaml)
     - name: Apply Ingress Controller
       run: |
-        kubectl apply -f k8s/ingress/ingress-nginx.aks.yaml
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+        helm repo update
+
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+        --namespace ingress-nginx \
+        --create-namespace \
+        --set controller.service.type=ClusterIP \
+        --set controller.ingressClassResource.name=nginx \
+        --set controller.ingressClassResource.controllerValue="k8s.io/ingress-nginx"
+
 
     # 5. Deploy Application + Ingress + Cloudflared
     - name: Apply Kubernetes Manifests

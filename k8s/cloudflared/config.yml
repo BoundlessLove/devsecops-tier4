@@ -3,5 +3,5 @@ credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
   - hostname: staging.systematicdefence.tech
-    service: http://aks-demo-service.default.svc.cluster.local:80
+    service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
   - service: http_status:404
