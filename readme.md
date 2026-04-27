@@ -153,6 +153,7 @@ v) AZURE_RESOURCE_GROUP
 vi) CLUSTER_NAME
 vii) IMAGE_NAME
 viii) IMAGE_TAG
+ix) LOCATION
 
 
  b. Adding github workflow aks_cicd.yaml from devsecops-tier3 dev branch, nativising it by adding trigger point as commit to Main branch.
