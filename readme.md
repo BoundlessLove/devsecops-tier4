@@ -319,6 +319,7 @@ jobs:
 
 ```
 
+
 g. Final currently usable structure of repository
 
 ```
@@ -346,6 +347,43 @@ k8s/
 
 Dockerfile
 server.js
+
+```
+## [PROPOSED]Version 1.2
+Aim is to make all infrastructure creation to be done by code - Infrastructure as a service.
+
+### a. Resource Group
+
+'Ensure Resource Group' step would be replaced by:  
+
+```
+# 0. Ensure Resource Group exists (via Bicep)
+- name: Ensure Resource Group exists
+  run: |
+    az deployment create \
+      --location "$LOCATION" \
+      --template-file infra/create-rg.bicep \
+      --parameters rgName="$RESOURCE_GROUP" rgLocation="$LOCATION"
+
+          
+```
+It would now refer to infra/create-rg.bicep:
+
+```bicep
+
+targetScope = 'resourceGroup'
+
+@description('Name of the resource group')
+param rgName string
+
+@description('Location of the resource group')
+param rgLocation string
+
+resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
+  name: rgName
+  location: rgLocation
+}
+
 
 ```
  
