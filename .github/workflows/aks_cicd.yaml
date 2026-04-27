@@ -35,7 +35,7 @@ jobs:
     # 0. Ensure Resource Group exists (via Bicep)
     - name: Ensure Resource Group exists
       run: |
-        az deployment create \
+        az deployment sub create \
           --location "$LOCATION" \
           --template-file infra/create-rg.bicep \
           --parameters rgName="$RESOURCE_GROUP" rgLocation="$LOCATION"
