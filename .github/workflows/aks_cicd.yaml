@@ -36,8 +36,10 @@ jobs:
     - name: Ensure Resource Group exists
       run: |
         az group create \
-          --name "$RESOURCE_GROUP" \
-          --location "$LOCATION"
+        --name "$RESOURCE_GROUP" \
+        --location "$LOCATION" \
+        --api-version 2021-04-01
+
 
     # 1. Deploy Infra via Bicep
     - name: Deploy ACR + AKS via Bicep
