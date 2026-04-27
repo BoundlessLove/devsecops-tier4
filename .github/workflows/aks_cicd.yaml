@@ -1,0 +1,57 @@
+name: Build and Deploy to AKS
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Azure CLI - Get ACR login server
+      id: acr
+      run: |
+        ACR_NAME=${{ secrets.ACR_NAME }}
+        echo "login_server=$(az acr show --name $ACR_NAME --query loginServer -o tsv)" >> $GITHUB_OUTPUT
+
+    - name: Build and Push Docker Image
+      run: |
+        IMAGE="${{ steps.acr.outputs.login_server }}/aks-demo:${{ github.sha }}"
+        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+        az acr build --registry ${{ secrets.ACR_NAME }} --image aks-demo:${{ github.sha }} .
+
+    - name: Get AKS Credentials
+      run: |
+        az aks get-credentials \
+          --resource-group ${{ secrets.AKS_RG }} \
+          --name ${{ secrets.AKS_NAME }} \
+          --overwrite-existing
+
+    - name: Update image in deployment
+      run: |
+        kubectl set image deployment/aks-demo-deployment \
+          aks-demo=$IMAGE
+
+    - name: Apply Kubernetes Manifests
+      run: |
+        kubectl apply -f k8s/ingress/ingress-nginx.yaml
+        kubectl apply -f k8s/ingress/staging-ingress.yaml
+        kubectl apply -f k8s/app/deployment.yaml
+        kubectl apply -f k8s/app/service.yaml
+        kubectl apply -f k8s/cloudflared/cloudflared-deployment.yaml

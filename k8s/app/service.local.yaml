@@ -3,9 +3,9 @@ kind: Service
 metadata:
   name: aks-demo-service
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: aks-demo
   ports:
-    - port: 8080
+    - port: 80
       targetPort: 8080

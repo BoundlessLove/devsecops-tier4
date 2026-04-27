@@ -1,0 +1,7 @@
+tunnel: aa1d965e-63ed-4002-be37-7a659a915cdb
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: staging.systematicdefence.tech
+    service: http://aks-demo-service.default.svc.cluster.local:80
+  - service: http_status:404
