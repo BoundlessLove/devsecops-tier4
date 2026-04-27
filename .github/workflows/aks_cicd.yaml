@@ -3,7 +3,7 @@ name: Build and Deploy to AKS
 on:
   push:
     branches:
-      - dev
+      - main
 
 permissions:
   id-token: write
@@ -27,20 +27,20 @@ jobs:
     - name: Azure CLI - Get ACR login server
       id: acr
       run: |
-        ACR_NAME=${{ secrets.ACR_NAME }}
+        ACR_NAME=${{ secrets.AZURE_CONTAINER_REGISTRY }}
         echo "login_server=$(az acr show --name $ACR_NAME --query loginServer -o tsv)" >> $GITHUB_OUTPUT
 
     - name: Build and Push Docker Image
       run: |
         IMAGE="${{ steps.acr.outputs.login_server }}/aks-demo:${{ github.sha }}"
         echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-        az acr build --registry ${{ secrets.ACR_NAME }} --image aks-demo:${{ github.sha }} .
+        az acr build --registry ${{ secrets.AZURE_CONTAINER_REGISTRY }} --image aks-demo:${{ github.sha }} .
 
     - name: Get AKS Credentials
       run: |
         az aks get-credentials \
-          --resource-group ${{ secrets.AKS_RG }} \
-          --name ${{ secrets.AKS_NAME }} \
+          --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+          --name ${{ secrets.CLUSTER_NAME }} \
           --overwrite-existing
 
     - name: Update image in deployment

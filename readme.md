@@ -137,7 +137,11 @@ See Annex A for process.
 
 ## Version 1.0
 
-26 April 2026 15:18 updates to readme.md for publishing
+26 April 2026 15:18 updates to readme.md for publishing.
+
+## Version 1.1
+
+27 April 2026 16:30 Added secrets to Github repo and first attempt at turning local setup to AKS via adding secret variables to github repository, adding github workflow aks_cicd.yaml, nativising it and making it launch on main branch.
 
 
 ## Annex A - How to create a connection to Cloudflare
