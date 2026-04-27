@@ -76,8 +76,7 @@ jobs:
         az aks get-credentials \
         --resource-group $RESOURCE_GROUP \
         --name $AKS_NAME \
-        --overwrite-existing \
-        --api-version 2024-11-01
+        --overwrite-existing
 
     # 4. Install NGINX Ingress Controller ( ingress-nginx.aks.yaml)
     - name: Apply Ingress Controller
