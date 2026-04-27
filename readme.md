@@ -264,12 +264,13 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    # 0. Ensure Resource Group
     - name: Ensure Resource Group exists
       run: |
-        az group create \
-          --name "$RESOURCE_GROUP" \
-          --location "$LOCATION"
+        if ! az group exists --name "$RESOURCE_GROUP"; then
+          az group create \
+            --name "$RESOURCE_GROUP" \
+            --location "$LOCATION"
+        fi
 
     # 1. Deploy Infra via Bicep
     - name: Deploy ACR + AKS via Bicep
