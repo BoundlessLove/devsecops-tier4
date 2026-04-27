@@ -366,6 +366,7 @@ spec:
 
 
 ii) k8s/app/service.aks.yaml 
+
 As my ingress above routes to port 80, so service should also expose port 80. Further I move it to cluster IP from Load Balancer type, as is required by nginx:
 
 
@@ -415,10 +416,10 @@ Dockerfile
 server.js
 
 ```
-## [PROPOSED]Version 1.2
-Aim is to make all infrastructure creation to be done by code - Infrastructure as a service.
 
-### a. Resource Group
+h. INFRASTRUCTURE AS A SERVICE: Replacing Azure CLI commands for creating infrastructure in pipeline with BICES files
+
+i) Resource Group
 
 'Ensure Resource Group' step would be replaced by:  
 
