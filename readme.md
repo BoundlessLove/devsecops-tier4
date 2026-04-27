@@ -427,7 +427,189 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 
 
 ```
- 
+
+## Version 1.2
+
+28 April 2026: Troubleshooting release:
+
+### a) ISSUE 1: CANNOT DEBUG AS NO LOGS.
+
+```
+PS C:\Windows\System32> kubectl get pods -n default 
+
+E0428 02:08:17.720351 24344 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get "https://host.docker.internal:30074/api?timeout=32s": dial tcp 192.168.1.6:30074: connectex: No connection could be made because the target machine actively refused it."
+```
+--SOLUTION--
+
+ROOT CAUSE:
+kubeconfig is pointing to a **local k3d cluster**, not AKS.
+
+Specifically, this endpoint:
+
+```
+https://host.docker.internal:30074
+```
+
+is **not** an AKS control plane.
+
+It is:
+
+- a k3d cluster API server  
+- running inside Docker  
+- which is currently **not running**  
+- so kubectl cannot connect  
+- so every kubectl command fails  
+- so you cannot inspect cloudflared  
+- so you cannot inspect ingress-nginx  
+- so you cannot inspect your AKS cluster at all  
+
+REMEDY:
+
+1. Remove the dead k3d context
+
+```powershell
+kubectl config delete-context k3d-aks-local
+kubectl config delete-cluster k3d-aks-local
+```
+
+(If the names differ, run `kubectl config get-contexts` first.)
+
+2. Remove the stale kubeconfig entirely (recommended)
+
+```powershell
+del $HOME\.kube\config
+```
+
+3. Re-fetch AKS credentials cleanly
+
+```powershell
+az login
+az account set --subscription "<your-subscription>"
+PS C:\Windows\System32> az aks get-credentials --resource-group DevSecOpsTier2 --name devsecopstier2aks --overwrite-existing
+```
+
+4. Test
+
+```powershell
+kubectl get nodes
+kubectl get pods -A
+
+PS C:\Windows\System32> kubectl config get-contexts 
+
+CURRENT NAME CLUSTER AUTHINFO NAMESPACE
+devsecopstier2aks   devsecopstier2aks   clusterUser_DevSecOpsTier2_devsecopstier2aks
+
+```
+
+### a) ISSUE 2: CLOUDFLARED APPEARS AS  'ContainerCreating', AFTER ISSUE 1 FIXED
+
+PS C:\Windows\System32> kubectl get pods -A
+NAMESPACE       NAME                                            READY   STATUS              RESTARTS   AGE
+
+...
+
+default         cloudflared-77944469cc-w5l7k                    0/1     ContainerCreating   0          14m
+
+...
+
+SOLUTION:
+
+Ran commands to create credentials and configmap:
+
+PS C:\Users\moose\git\devsecops-tier4> kubectl create secret generic cloudflared-credentials `
+ --from-file=credentials.json=./k8s/cloudflared/credentials/aa1d965e-63ed-4002-be37-7a659a915cdb.json
+
+secret/cloudflared-credentials created
+
+PS C:\Users\moose\git\devsecops-tier4> kubectl create configmap cloudflared-config --from-file=config.yml=./k8s/cloudflared/config.yml
+
+configmap/cloudflared-config created
+
+PS C:\Users\moose\git\devsecops-tier4> kubectl rollout restart deployment cloudflared
+
+deployment.apps/cloudflared restarted
+
+PS C:\Users\moose\git\devsecops-tier4> kubectl get pods -n default
+
+NAME                                   READY   STATUS             RESTARTS   AGE
+
+...
+
+cloudflared-59887744bd-nf8lf           1/1     Running            0          18s
+
+...
+
+Note: It is standard practice to run this when creating a new cluster. I was not aware that it was needed when moving from local kubernetes to Azure Kubernetes.
+
+
+### c) ISSUE 2: APP appears broken on pods with STATUS of 'InvalidImageName' AFTER ISSUE 1 FIXED
+
+PS C:\Windows\System32> kubectl get pods -A
+NAMESPACE       NAME                                            READY   STATUS              RESTARTS   AGE
+
+default         aks-demo-deployment-74868c9485-gsgqh            0/1     InvalidImageName    0          14m
+
+default         aks-demo-deployment-74868c9485-qtssb            0/1     InvalidImageName    0          14m
+
+...
+
+
+#### SOLUTION
+
+##### ROOT CAUSE
+
+```yaml
+
+-- k8s/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aks-demo-deployment
+  labels:
+    app: aks-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aks-demo
+  template:
+    metadata:
+      labels:
+        app: aks-demo
+    spec:
+      containers:
+        - name: aks-demo
+          image: ${AZURE_CONTAINER_REGISTRY}.azurecr.io/aks-demo:${IMAGE_TAG}
+          ports:
+            - containerPort: 8080
+```
+This is when the 'aks-cicd.yaml' pipeline calls it with following variables:
+
+```yaml
+
+    env:
+      ACR_NAME: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      AKS_NAME: ${{ secrets.CLUSTER_NAME }}
+      LOCATION: ${{ secrets.AZURE_LOCATION }}
+      IMAGE_NAME: ${{ secrets.IMAGE_NAME }}
+      IMAGE_TAG: ${{ secrets.IMAGE_TAG }}
+```
+
+##### REMEDY
+
+Update line in k8s/deployment.yaml:
+
+```yaml
+image: ${AZURE_CONTAINER_REGISTRY}.azurecr.io/aks-demo:${IMAGE_TAG}
+```
+
+with:
+
+```yaml
+image: ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}
+ ```
 
 ## Annex A - How to create a connection to Cloudflare
 

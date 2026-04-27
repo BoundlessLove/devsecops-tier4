@@ -17,6 +17,6 @@ spec:
     spec:
       containers:
         - name: aks-demo
-          image: ${AZURE_CONTAINER_REGISTRY}.azurecr.io/aks-demo:${IMAGE_TAG}
+          image: ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}
           ports:
             - containerPort: 8080
