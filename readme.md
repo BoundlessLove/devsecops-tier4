@@ -141,7 +141,31 @@ See Annex A for process.
 
 ## Version 1.1
 
-27 April 2026 16:30 Added secrets to Github repo and first attempt at turning local setup to AKS via adding secret variables to github repository, adding github workflow aks_cicd.yaml, nativising it and making it launch on main branch.
+27 April 2026 16:30 First attempt at turning local setup to AKS.
+
+a. Added Following secrets to Github repo:
+
+i) AZURE_CLIENT_ID
+ii) AZURE_TENANT_ID
+iii) AZURE_SUBSCRIPTION_ID
+vi) AZURE_CONTAINER_REGISTRY
+v) AZURE_RESOURCE_GROUP
+vi) CLUSTER_NAME
+vii) IMAGE_NAME
+viii) IMAGE_TAG
+
+
+ b. Adding github workflow aks_cicd.yaml, nativising it by adding trigger point as commit to Main branch.
+ 
+ c. Creating a federated-credentail for the pipeline
+
+PS /home/jay> az ad app federated-credential create --id <App registeration Client ID>   --parameters '{
+    "name": "github-devsecops-tier4-aks",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:BoundlessLove/devsecops-tier4:ref:refs/heads/main",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
 
 
 ## Annex A - How to create a connection to Cloudflare
