@@ -99,15 +99,23 @@ iv. [Navigate to] http://localhost:8080.
 
 ![Working https Screenshot without Ingress](./screenshots/CloudfareTalkingToAKS-Service.jpg)
 
-Issue is that Azure Kubernetes does not accept traefik loadbalancer, and while this setup  works, but:
-•	You bypass Ingress rules
-•	You bypass NGINX features
-•	You bypass path routing
-•	You bypass host routing
-•	You bypass TLS termination
-•	You bypass rate limiting
-•	You bypass WAF rules
-•	You bypass rewrite rules
+Issue is that Azure Kubernetes does not accept traefik loadbalancer, and while this setup  works, but it:
+
+•	Bypasses Ingress rules
+
+•	Bypasses NGINX features
+
+•	Bypasses path routing
+
+•	Bypasses host routing
+
+•	Bypasses TLS termination
+
+•	Bypasses rate limiting
+
+•	Bypasses WAF rules
+
+•	Bypasses rewrite rules
 
 See Annex A for process.
 
