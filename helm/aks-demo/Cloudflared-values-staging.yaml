@@ -1,0 +1,5 @@
+cloudflared:
+  tunnelName: aks-demo-staging-tunnel
+  secretName: cloudflared-credentials-staging
+  hostname: staging.systematicdefence.tech
+  service: http://aks-demo-service.staging.svc.cluster.local:80

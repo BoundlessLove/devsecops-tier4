@@ -597,9 +597,7 @@ This is when the 'aks-cicd.yaml' pipeline calls it with following variables:
       IMAGE_TAG: ${{ secrets.IMAGE_TAG }}
 ```
 
-##### REMEDY
-
-Update line in k8s/deployment.yaml:
+Some said that updating line in k8s/deployment.aks.yaml,
 
 ```yaml
 image: ${AZURE_CONTAINER_REGISTRY}.azurecr.io/aks-demo:${IMAGE_TAG}
@@ -610,6 +608,155 @@ with:
 ```yaml
 image: ${ACR_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}
  ```
+ 
+ would fix issue. But it does not, becuase Kubernetes cannot expand ${IMAGE_NAME}. 
+Helm can expand {{ .Values.imageName }} and also allow rollbacks, hence moving to that for deployment of cluster. Example, current issue is:
+
+```
+InvalidImageName: ${IMAGE_NAME} must be lowercase
+```
+
+It will become under HELM:
+
+```
+{{ .Values.imageName }}
+```
+
+Appearing as:
+
+```
+image: "devsecopstier2acr.azurecr.io/aks-demo:latest"
+```
+
+
+
+
+
+
+
+##### SOLUTION IS HELM IMPLEMENTATION
+
+###### 1. Structure and Components
+
+i) Structure
+
+```YAML
+
+helm/
+  aks-demo/
+    Chart.yaml
+    values.yaml
+    templates/
+      deployment.yaml
+      service.yaml
+
+```
+
+ii) Chart.yaml
+
+```
+
+apiVersion: v2
+name: aks-demo
+description: A Helm chart for the aks-demo application
+type: application
+version: 0.1.0
+appVersion: "1.0"
+
+
+```
+
+iii) values.yaml
+
+```
+
+acrName: devsecopstier2acr
+imageName: aks-demo
+imageTag: latest
+
+replicaCount: 2
+service:
+  port: 80
+  targetPort: 8080
+
+
+```
+
+iv) templates/deployment.yaml
+
+```
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aks-demo-deployment
+  labels:
+    app: aks-demo
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: aks-demo
+  template:
+    metadata:
+      labels:
+        app: aks-demo
+    spec:
+      containers:
+        - name: aks-demo
+          image: "{{ .Values.acrName }}.azurecr.io/{{ .Values.imageName }}:{{ .Values.imageTag }}"
+          ports:
+            - containerPort: 8080
+
+
+```
+
+v) templates/service.yaml
+
+```
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: aks-demo-service
+spec:
+  type: ClusterIP
+  selector:
+    app: aks-demo
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+
+
+```
+
+###### 2. How to Deploy using Helm and CICD
+
+i. Local test
+
+```
+
+helm upgrade --install aks-demo ./helm/aks-demo
+
+```
+
+ii. Override image tag from CI/CD
+
+```
+
+helm upgrade --install aks-demo ./helm/aks-demo \
+  --set imageTag=${IMAGE_TAG}
+
+```
+Note: Even ACR name can be overridden:
+
+```
+
+--set acrName=${ACR_NAME}
+```
+
+
+
 
 ## Annex A - How to create a connection to Cloudflare
 
@@ -1006,7 +1153,7 @@ a. Create secret:
 kubectl create secret generic cloudflared-credentials `
   --from-file=credentials.json=k8s/cloudflared/credentials/aa1d965e-63ed-4002-be37-7a659a915cdb.json
   
-kubectl create secret generic cloudflared-cert \
+kubectl create secret generic cloudflared-cert `
   --from-file=cert.pem=k8s/cloudflared/credentials/cert.pem
   ```
 

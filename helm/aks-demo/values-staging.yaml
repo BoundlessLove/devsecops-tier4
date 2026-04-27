@@ -1,0 +1,24 @@
+acrName: devsecopstier2acr
+imageName: aks-demo
+imageTag: staging
+
+replicaCount: 1
+
+service:
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  host: staging.systematicdefence.tech
+  tls:
+    enabled: false
+    secretName: ""
+
+cloudflared:
+  tunnelName: aks-demo-staging-tunnel
+  secretName: cloudflared-credentials-staging
+  hostname: staging.systematicdefence.tech
+  service: http://aks-demo-service.staging.svc.cluster.local:80
+	

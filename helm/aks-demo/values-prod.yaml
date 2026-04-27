@@ -1,0 +1,23 @@
+acrName: devsecopstier2acr
+imageName: aks-demo
+imageTag: prod
+
+replicaCount: 3
+
+service:
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  host: systematicdefence.tech
+  tls:
+    enabled: true
+    secretName: aks-demo-tls
+
+cloudflared:
+  tunnelName: aks-demo-prod-tunnel
+  secretName: cloudflared-credentials-prod
+  hostname: systematicdefence.tech
+  service: http://aks-demo-service.prod.svc.cluster.local:80

@@ -1,0 +1,5 @@
+cloudflared:
+  tunnelName: aks-demo-prod-tunnel
+  secretName: cloudflared-credentials-prod
+  hostname: systematicdefence.tech
+  service: http://aks-demo-service.prod.svc.cluster.local:80
