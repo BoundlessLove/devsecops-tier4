@@ -989,7 +989,10 @@ spec:
 
 ```
 
-Please refere to Readme2.md in this repo for the concepts needed to run this pipeline. But First some Pre-req steps:
+### e) Conscise Readme.md
+Please refere to Readme2.md in this repo for the concepts needed to run this pipeline. But First some Pre-req and Post steps.
+
+### f) Pre-requisites
 
 a. Ensure you have created a staging branch,
 b. Service Principal credentails created to operate on subscription:
@@ -1046,8 +1049,32 @@ helm upgrade --install aks-demo ./helm/aks-demo \
   --set imageTag=$IMAGE_TAG
 
 ```
+### g) Post Pipeline Run actions
+
+a. Create Secrets and, deploy containers and Cloudflarer
+
+Run Annex A., Steps 8 and 9. Specifically:
+
+i) kubectl get pods -A
+
+ii) PS C:\Users\moose\git\devsecops-tier4> kubectl create secret generic cloudflared-credentials `
+ --from-file=credentials.json=./k8s/cloudflared/credentials/aa1d965e-63ed-4002-be37-7a659a915cdb.json
+
+secret/cloudflared-credentials created
+
+iii) PS C:\Users\moose\git\devsecops-tier4> kubectl rollout restart deployment -n cloudflare
+deployment.apps/aks-demo-deployment restarted
+deployment.apps/cloudflared restarted
 
 
+
+b. Delete resources manually once pipeline successful
+
+In devsecops-tier3, this step is automated. However, once setup, it is not easy to tear, as I removed the code and tearing process did not stop. It is not convenient when debugging as Azure is Idompotent and a lot of time is saved by reusing resources during debugging stage. Hence, here I chose to keep the manual option to delete resources.
+
+# Version 3.0
+
+28 April 2026  16:39 : Separating out Cloudflared components from aks-demo. Move to Helm for deployment is complete for both types of components and they will be isolate from each other in their own folders. Further connectivity test added to verify if the end is near. 
 
 ## Annex A - How to create a connection to Cloudflare
 
@@ -1434,7 +1461,7 @@ spec:
 
 ### STEP 8 - Deploy cloudflared inside Kubernetes
 
-You could be deploying cloudflared for first time or updating existing:
+Launch Powershell with Azure CLI. Run cmd "AZ login" and verify you can act upon your AKS containing subscription. You could be deploying cloudflared for first time or updating existing:
 
 #### i. New Deployment
 

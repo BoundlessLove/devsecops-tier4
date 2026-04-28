@@ -1,0 +1,12 @@
+replicaCount: 1
+
+image:
+  repository: cloudflare/cloudflared
+  tag: latest
+  pullPolicy: IfNotPresent
+
+cloudflared:
+  tunnelName: ""
+  secretName: ""
+  hostname: ""
+  service: ""

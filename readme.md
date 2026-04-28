@@ -8,6 +8,45 @@ This repo builds and deploys the `aks-demo` app to Azure Kubernetes Service (AKS
 - NGINX Ingress Controller
 - Cloudflare Tunnel for external HTTPS access
 
+## DESIGN
+
+FINAL AKS ARCHITECTURE DIAGRAM (ASCII)
+                    ┌─────────────────────────────────┐
+                    │        Cloudflare DNS           │
+                    │  staging.systematicdefence.tech │
+                    └──────────────┬──────────────────┘
+                                   │
+                                   ▼
+                        ┌────────────────────────┐
+                        │  Cloudflare Tunnel     │
+                        │  (cloudflared pod)     │
+                        │   namespace: cloudflare│
+                        └────────────┬───────────┘
+                                     │
+                                     ▼
+                        ┌───────────────────────────┐
+                        │   NGINX Ingress Ctrl      │
+                        │   namespace: ingress-nginx│
+                        └────────────┬──────────────┘
+                                     │
+                                     ▼
+                        ┌──────────────────────────────────────┐
+                        │     Ingress Rule                     │
+                        │  host: staging.systematicdefence.tech│
+                        └────────────┬─────────────────────────┘
+                                     │
+                                     ▼
+                        ┌─────────────────────────┐
+                        │   aks-demo-service      │
+                        │   namespace: staging    │
+                        └────────────┬────────────┘
+                                     │
+                                     ▼
+                        ┌────────────────────────┐
+                        │   aks-demo pods        │
+                        │   namespace: staging   │
+                        └────────────────────────┘
+
 ## Folder structure
 
 - `infra/` – Bicep templates for AKS + ACR + RG
