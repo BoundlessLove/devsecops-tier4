@@ -975,7 +975,18 @@ spec:
 
 ```
 
-Please refere to Readme2.md in this repo for the concepts needed to run this pipeline. Firstly, ensure you have created a staging branch.
+Please refere to Readme2.md in this repo for the concepts needed to run this pipeline. But First some Pre-req steps:
+
+a. Ensure you have created a staging branch,
+b. Service Principal credentails created to operate on subscription:
+
+az ad app federated-credential create --id <client ID>   --parameters '{
+    "name": "github-devsecops-tier4-staging",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": " repo:BoundlessLove/devsecops-tier4:ref:refs/heads/staging",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
 
 
 ## Annex A - How to create a connection to Cloudflare
