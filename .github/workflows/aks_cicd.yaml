@@ -119,7 +119,7 @@ jobs:
           -f ./helm/aks-demo/cloudflared-values.yaml
 
     # 7. Smoke test
-    - name: Smoke test HTTP endpoint
+    - name: Smoke test HTTPS endpoint
       run: |
         if [[ "${GITHUB_REF##*/}" == "staging" ]]; then
           URL="https://staging.systematicdefence.tech"

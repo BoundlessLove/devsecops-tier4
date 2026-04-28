@@ -986,6 +986,52 @@ az ad app federated-credential create --id <client ID>   --parameters '{
     "subject": " repo:BoundlessLove/devsecops-tier4:ref:refs/heads/staging",
     "audiences": ["api://AzureADTokenExchange"]
   }'
+  
+c. CLEAN UP CHECKLIST:
+
+i) Delete Old Ingress:
+  
+  ```yml
+  kubectl delete ingress staging-ingress -n default --ignore-not-found
+  ```
+
+ii) Delete old deployment + service (if they exist)
+
+```bash
+
+kubectl delete deployment aks-demo-deployment -n default --ignore-not-found
+kubectl delete service aks-demo-service -n default --ignore-not-found
+```
+iii) Delete old cloudflared deployment
+
+```bash
+
+kubectl delete deployment cloudflared -n default --ignore-not-found
+```
+iv) If still there, remove all kubectl apply lines from pipeline
+
+```bash
+
+Pipeline now only deploys using Helm as the current STEP 'Deploy aks-demo via Helm' there deploys like this:
+
+```
+--
+#### 1. Staging
+````
+helm upgrade --install aks-demo-staging ./helm/aks-demo \
+  -n staging \
+  -f values-staging.yaml \
+  --set imageTag=$IMAGE_TAG
+```
+--
+#### 2. Production
+```
+helm upgrade --install aks-demo ./helm/aks-demo \
+  -n prod \
+  -f values-prod.yaml \
+  --set imageTag=$IMAGE_TAG
+
+```
 
 
 
@@ -1286,10 +1332,10 @@ ingress:
     service: http://ingress-nginx-controller.ingress-nginx.svc.cluster.local:80
   - service: http_status:404
 ```
----
+--
 ##### docker-compose.yml
 
-```yaml
+```yml
 
 version: "3.8"
 
