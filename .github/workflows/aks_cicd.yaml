@@ -110,13 +110,24 @@ jobs:
           -f "$VALUES_FILE" \
           --set imageTag="$IMAGE_TAG"
 
-    # 6. Deploy Cloudflare Tunnel via Helm
-    - name: Deploy Cloudflare Tunnel
+       # 6. Deploy Cloudflare Tunnel via Helm
+    - name: Deploy Cloudflare Tunnel via Helm
       run: |
-        helm upgrade --install cloudflared ./helm/aks-demo \
-          --namespace cloudflare \
-          --create-namespace \
-          -f ./helm/aks-demo/cloudflared-values.yaml
+        if [[ "${GITHUB_REF##*/}" == "staging" ]]; then
+          VALUES_FILE="./helm/aks-demo/cloudflared-values-staging.yaml"
+          RELEASE="cloudflared-staging"
+          NAMESPACE="cloudflare"
+        else
+          VALUES_FILE="./helm/aks-demo/cloudflared-values-prod.yaml"
+          RELEASE="cloudflared-prod"
+          NAMESPACE="cloudflare"
+        fi
+
+          helm upgrade --install "$RELEASE" ./helm/aks-demo \
+            --namespace "$NAMESPACE" \
+            --create-namespace \
+            -f "$VALUES_FILE"
+
 
     # 7. Smoke test
     - name: Smoke test HTTPS endpoint

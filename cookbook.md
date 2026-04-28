@@ -911,10 +911,24 @@ jobs:
 
 #### ii. values-staging.yaml
 
-```
+```yml
 
 
 ```
+--
+
+<i>
+ <b>
+ Note on Cloudflared-value-xx..yaml - Cloudflare Tunnel should always be deployed:</b></i>
+
+1. With its own release name
+
+2. Into its own namespace, and 
+
+3. Using environment specific values files 
+
+This is because while it part of the cluster, it is a different component than the rest. Hence, it needs its own release name e.g. cloudflared-staging. If it shares a release name with others e.g. "aks-demo-staging", then Helm can overwrite those components with it. Further since each environment has its own hostname, tunnel name and such, a base file is not needed eithe as it would be empy.
+
 
 #### iii. Cloudflared-values-prod.yaml
 
