@@ -10,7 +10,8 @@ This repo builds and deploys the `aks-demo` app to Azure Kubernetes Service (AKS
 
 ## DESIGN
 
-FINAL AKS ARCHITECTURE DIAGRAM (ASCII)
+                      FINAL AKS ARCHITECTURE DIAGRAM
+```plaintext
                     ┌─────────────────────────────────┐
                     │        Cloudflare DNS           │
                     │  staging.systematicdefence.tech │
@@ -46,7 +47,7 @@ FINAL AKS ARCHITECTURE DIAGRAM (ASCII)
                         │   aks-demo pods        │
                         │   namespace: staging   │
                         └────────────────────────┘
-
+```
 ## Folder structure
 
 - `infra/` – Bicep templates for AKS + ACR + RG
